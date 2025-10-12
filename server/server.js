@@ -2,18 +2,18 @@
 import express, { json, urlencoded } from 'express';
 import cors from 'cors';
 import multer, { diskStorage } from 'multer';
-import { scrapeJobDescription } from './scraper';
-import { extractSkills } from './skillModel';
+import { scrapeJobDescription } from './lib/scraper.js';
+import { extractSkills } from './lib/skillModel.js';
 
 const app = express();
 const PORT = 3001;
 
-// --- Middleware ---
+// middleware
 app.use(cors()); // Allow cross-origin requests
 app.use(json()); // Parse JSON bodies
 app.use(urlencoded({ extended: true })); // Parse URL-encoded bodies
 
-// --- Multer Setup for File Uploads ---
+// multer to handle file uploads
 // store files in a uploads/ directory
 const storage = diskStorage({
     destination: (req, file, cb) => {
@@ -26,8 +26,7 @@ const storage = diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- API Endpoint ---
-// This endpoint will handle the resume and job URL submission
+// api endpoint
 app.post('/api/enhance', upload.single('resume'), async (req, res) => {
     if (!req.file || !req.body.jobUrl) {
         return res.status(400).json({ error: 'Resume file and job URL are required.' });
@@ -47,7 +46,7 @@ app.post('/api/enhance', upload.single('resume'), async (req, res) => {
         }
 
         // analyze the job description to extract skills
-        const skills = extractSkills(jobText);
+        const skills = await extractSkills(jobText);
 
         //temporarily return the detected skills and resume path
         res.status(200).json({
@@ -60,7 +59,6 @@ app.post('/api/enhance', upload.single('resume'), async (req, res) => {
         res.status(500).json({ error: 'An internal server error occurred.' });
     }
 });
-
 
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
