@@ -2,9 +2,6 @@ import React from "react";
 import { Link, Outlet } from "react-router-dom";
 
 function App() {
-  // This component provides the overall layout, including a navigation bar.
-  // The <Outlet /> component is a placeholder from React Router where the
-  // content of the child routes (like HomePage or EnhancePage) will be rendered.
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
       <header className="bg-white shadow-md">
@@ -34,7 +31,6 @@ function App() {
       </header>
 
       <main className="container mx-auto p-6 md:p-8">
-        {/* Child route components will be rendered here */}
         <Outlet />
       </main>
 

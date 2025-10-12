@@ -1,6 +1,5 @@
-/* We are using Tailwind CSS for styling. This file is for base styles. */
 @import "tailwindcss";
-/* You can add custom base styles here if needed */
+
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

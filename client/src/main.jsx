@@ -5,20 +5,19 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import App from "./App.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import EnhancePage from "./pages/EnhancePage.jsx";
-import "./index.css"; // We'll add some basic styles here later
+import "./index.css";
 
-// This is where we define the navigation routes for the application.
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <App />, // The main App component acts as the layout/shell
+    element: <App />,
     children: [
       {
-        index: true, // This makes HomePage the default route for '/'
+        index: true,
         element: <HomePage />,
       },
       {
-        path: "enhance", // The path for the resume enhancement page
+        path: "enhance",
         element: <EnhancePage />,
       },
     ],
