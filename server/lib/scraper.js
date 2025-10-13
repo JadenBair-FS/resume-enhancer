@@ -5,7 +5,9 @@ async function scrapeJobDescription(url) {
     try {
         console.log(`Scraping URL: ${url}`);
         browser = await chromium.launch({ headless: true });
-        const context = await browser.newContext();
+        const context = await browser.newContext({
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        });
         const page = await context.newPage();
         await page.goto(url, { waitUntil: 'domcontentloaded' });
 
@@ -15,9 +17,9 @@ async function scrapeJobDescription(url) {
         if (url.includes('indeed.com')) {
             console.log('Indeed URL detected.');
             // Use the specific selector for Indeed's job description element
-            const jobDescriptionElement = page.locator('#jobDescriptionText');
+            const jobDescriptionElement = page.locator('#viewJobSSRRoot');
             // Wait for the selector to ensure the element is loaded
-            await jobDescriptionElement.waitFor({ state: 'visible', timeout: 5000 });
+            //await jobDescriptionElement.waitFor({ state: 'visible', timeout: 5000 });
             jobDescriptionText = await jobDescriptionElement.innerText();
         } else {
             console.log('Generic URL. Scraping all body text.');
