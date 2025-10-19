@@ -7,9 +7,14 @@ import { extractSkills } from './lib/skillModel.js';
 import axios from 'axios';
 import FormData from 'form-data';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const app = express();
 const PORT = 3001;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // middleware
 app.use(cors()); // Allow cross-origin requests
@@ -65,33 +70,35 @@ app.post('/api/enhance', upload.single('resume'), async (req, res) => {
     }
 });
 
+app.get('/responses/enhanced-:filename', (req, res) => {
+    const { filename } = req.params;
+    const enhancedFilename = `enhanced-${filename}`;
+
+    const filePath = path.join(__dirname, 'responses', enhancedFilename);
+
+    res.download(filePath, (err) => {
+        if (err) {
+            console.error("Error downloading file:", err);
+            if (err.code === 'ENOENT') {
+                return res.status(404).send({ message: "File not found." });
+            }
+            return res.status(500).send({ message: "Could not download the file." });
+        }
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
 
 
-/**
- * Sends a resume and skill list to the Python microservice to add the skills.
- *
- * @param {string} resumeFilePath Path to the user's uploaded .docx resume.
- * @param {string[]} skillsToAdd Array of skill strings to add (e.g., ["Node.js", "React"]).
- * @param {string} outputFilePath Where to save the modified resume.
- * @returns {Promise<void>}
- */
 async function addSkillsToResume(resumeFilePath, skillsToAdd, outputFilePath) {
 
-    // The URL of your running Python microservice
     const microserviceUrl = 'http://127.0.0.1:5000/add-skills';
-
-    // 1. Create a new FormData object
     const formData = new FormData();
 
-    // 2. Append the resume file
-    // We use createReadStream to handle the file
     formData.append('resume', fs.createReadStream(resumeFilePath));
 
-    // 3. Append each skill
-    // It's important to append each skill with the *same key* ('skills')
     for (const skill of skillsToAdd) {
         formData.append('skills', skill);
     }
@@ -99,19 +106,14 @@ async function addSkillsToResume(resumeFilePath, skillsToAdd, outputFilePath) {
     console.log('Sending data to Python service...');
 
     try {
-        // 4. Make the POST request
         const response = await axios.post(
             microserviceUrl,
             formData,
             {
-                // This is crucial: Set the headers from the form-data library
                 headers: formData.getHeaders(),
-                // This is also crucial: Tell axios to expect a file stream back
                 responseType: 'stream',
             }
         );
-
-        // 5. Save the returned file
         const writer = fs.createWriteStream(outputFilePath);
         response.data.pipe(writer);
 
@@ -127,10 +129,8 @@ async function addSkillsToResume(resumeFilePath, skillsToAdd, outputFilePath) {
         });
 
     } catch (error) {
-        // Handle errors (e.g., Python service is down, or it returned a 400/500)
         if (error.response) {
             console.error(`Error from service: ${error.response.status}`);
-            // If the service sent a JSON error, we need to read the stream
             const errorData = await streamToString(error.response.data);
             console.error('Error details:', errorData);
         } else {
@@ -140,7 +140,6 @@ async function addSkillsToResume(resumeFilePath, skillsToAdd, outputFilePath) {
     }
 }
 
-// Helper function to read an error stream
 function streamToString(stream) {
     const chunks = [];
     return new Promise((resolve, reject) => {
