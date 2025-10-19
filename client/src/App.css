@@ -201,3 +201,212 @@ header p {
   border-radius: 16px;
   font-size: 14px;
 }
+
+.success-message {
+  color: var(--success-color);
+  background-color: #d1fae5;
+  border: 1px solid var(--success-color);
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.form-group input[type="email"],
+.form-group input[type="password"] {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input[type="email"]:focus,
+.form-group input[type="password"]:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.1);
+}
+
+.header-with-logout {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.header-with-logout .header-content {
+  flex-grow: 1;
+}
+
+.header-with-logout h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-color);
+  margin: 0 0 4px 0;
+  text-align: left;
+}
+
+.header-with-logout p {
+  font-size: 16px;
+  color: var(--text-light);
+  margin: 0;
+  text-align: left;
+}
+
+.btn-logout {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-light);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+.btn-logout:hover {
+  background-color: var(--background-color);
+  border-color: var(--text-light);
+}
+
+.dashboard-card {
+  max-width: 900px; /* Make the card wider */
+}
+
+.dashboard-layout {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+}
+
+.dashboard-nav {
+  display: flex;
+  flex-direction: column;
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-color);
+  padding-right: 24px;
+}
+
+.nav-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-light);
+  padding: 12px;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-btn:hover {
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+.nav-btn.active {
+  background-color: #eef2ff;
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.dashboard-content {
+  flex-grow: 1;
+  width: 100%;
+}
+
+.nav-upgrade {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+.nav-upgrade p {
+  font-size: 14px;
+  color: var(--text-light);
+  margin-bottom: 12px;
+}
+
+.upgrade-btn {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+}
+
+.history-container h2 {
+  margin-top: 0;
+  color: var(--text-color);
+}
+
+.history-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  max-height: 500px; /* Add a scrollbar if the list gets too long */
+  overflow-y: auto;
+}
+
+.history-item {
+  background-color: var(--background-color);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.history-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.history-item-header strong {
+  font-size: 16px;
+  color: var(--text-color);
+}
+
+.btn-small {
+  padding: 6px 12px;
+  margin-top: 0;
+  width: auto;
+  align-self: flex-start;
+}
+
+.history-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.history-job-link {
+  font-size: 14px;
+  color: var(--text-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.history-job-link a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+.history-job-link a:hover {
+  text-decoration: underline;
+}
+
+.history-item .skills-list {
+  margin-top: 10px;
+  justify-content: flex-start;
+}

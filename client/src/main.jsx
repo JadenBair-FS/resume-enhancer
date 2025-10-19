@@ -1,31 +1,15 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+//import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 import App from "./App.jsx";
-import HomePage from "./pages/HomePage.jsx";
-import EnhancePage from "./pages/EnhancePage.jsx";
 import "./index.css";
-
-const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <App />,
-    children: [
-      {
-        index: true,
-        element: <HomePage />,
-      },
-      {
-        path: "enhance",
-        element: <EnhancePage />,
-      },
-    ],
-  },
-]);
+import { AuthProvider } from "./AuthContext.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <AuthProvider>
+      <App />
+    </AuthProvider>
   </React.StrictMode>
 );
