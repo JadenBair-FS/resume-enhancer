@@ -167,7 +167,7 @@ function App() {
     <div className="app-container">
       <div className="card">
         <header>
-          <h1>Resume Enhancer 🚀</h1>
+          <h1>Resume Enhancer</h1>
           <p>
             Upload your resume and a job link. We'll add the key skills for you.
           </p>
