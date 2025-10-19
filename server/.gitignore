@@ -27,3 +27,4 @@ dist-ssr
 
 # ignore uploads created by Multer
 uploads/
+responses/
