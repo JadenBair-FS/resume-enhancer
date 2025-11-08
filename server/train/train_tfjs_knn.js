@@ -1,43 +1,34 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
-import '@tensorflow/tfjs-backend-cpu';
-import * as use from '@tensorflow-models/universal-sentence-encoder';
-import { parse } from 'csv-parse/sync';
+import { parse } from 'csv-parse';
 import cliProgress from 'cli-progress';
 
-const require = createRequire(import.meta.url);
-const tf = require('@tensorflow/tfjs-node');
+import '@tensorflow/tfjs-node';
+import * as tf from '@tensorflow/tfjs-node';
+import * as use from '@tensorflow-models/universal-sentence-encoder';
 
 
 // --- CONFIGURATION ---
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// **NEW**: Update paths to your downloaded Kaggle CSVs
 const SUMMARY_CSV_PATH = path.resolve(__dirname, 'job_summary.csv');
 const SKILLS_CSV_PATH = path.resolve(__dirname, 'job_skills.csv');
 
-// **NEW**: Make sure your model artifacts path is correct
 const MODEL_ARTIFACTS_PATH = path.resolve(__dirname, 'model');
 const EMBEDDINGS_PATH = path.resolve(MODEL_ARTIFACTS_PATH, 'embeddings.json');
 const LABELS_PATH = path.resolve(MODEL_ARTIFACTS_PATH, 'labels.json');
 
-// **REMOVED**: The hardcoded SKILL_DATASET is no longer needed.
-
 // --- TRAINING CONFIG ---
 // Set to -1 to use all data.
-const SAMPLE_LIMIT = -1;
+const SAMPLE_LIMIT = 100;
 const BATCH_SIZE = 100;
 const DRY_RUN = false;
 const DRY_RUN_SKILLS = ['javascript', 'python', 'react'];
 
-// **REMOVED**: escapeRegExp function is no longer needed.
-
 async function main() {
     console.log('Starting training process...');
 
-    // **NEW**: Check for both CSV files
     if (!fs.existsSync(SUMMARY_CSV_PATH)) {
         console.error(`Error: job_summary.csv not found at ${SUMMARY_CSV_PATH}`);
         process.exit(1);
@@ -47,19 +38,18 @@ async function main() {
         process.exit(1);
     }
 
-    // --- 1. Load Summaries into a Map ---
-    console.log(`Loading and parsing ${SUMMARY_CSV_PATH}...`);
-    const summaryCsvData = fs.readFileSync(SUMMARY_CSV_PATH, 'utf8');
-    const summaryRecords = parse(summaryCsvData, {
-        columns: true,
-        skip_empty_lines: true,
-        trim: true,
-    });
-
-    console.log(`Loaded ${summaryRecords.length} summary records.`);
+// --- 1. Load Summaries into a Map ---
+    console.log(`Streaming and parsing ${SUMMARY_CSV_PATH}...`);
     console.log('Creating job_link -> summary map...');
     const jobLinkToSummaryMap = new Map();
-    for (const record of summaryRecords) {
+    const summaryParser = fs.createReadStream(SUMMARY_CSV_PATH)
+        .pipe(parse({
+            columns: true,
+            skip_empty_lines: true,
+            trim: true,
+        }));
+
+    for await (const record of summaryParser) {
         if (record.job_link && record.job_summary) {
             jobLinkToSummaryMap.set(record.job_link, record.job_summary);
         }
@@ -67,74 +57,79 @@ async function main() {
     console.log(`Map created with ${jobLinkToSummaryMap.size} valid summaries.`);
 
 
-    // --- 2. Load Skills and Group Summaries ---
-    console.log(`Loading and parsing ${SKILLS_CSV_PATH}...`);
-    const skillsCsvData = fs.readFileSync(SKILLS_CSV_PATH, 'utf8');
-    const skillRecords = parse(skillsCsvData, {
-        columns: true,
-        skip_empty_lines: true,
-        trim: true,
-    });
-
-    console.log(`Loaded ${skillRecords.length} skill records.`);
+   // --- 2. Load Skills and Group Summaries ---
+    console.log(`Streaming and parsing ${SKILLS_CSV_PATH}...`);
     console.log('Grouping job summaries by skill...');
-
-    // **MODIFIED**: This map now holds summaries, not descriptions
     const skillsToSummaries = new Map();
-    
-    // **MODIFIED**: This loop replaces the old regex logic
-    for (const record of skillRecords) {
-        if (!record.job_link || !record.job_skill) continue;
 
-        const skillKey = record.job_skill.toLowerCase();
+    const skillParser = fs.createReadStream(SKILLS_CSV_PATH)
+        .pipe(parse({
+            columns: true,
+            skip_empty_lines: true,
+            trim: true,
+        }));
+
+// This loop now does the work of the old "for (const record of skillRecords)" loop
+    for await (const record of skillParser) {
+        // Use your corrected column name 'job_skills'
+     if (!record.job_link || !record.job_skills) continue;
+
         const jobLink = record.job_link;
-        
-        // Find the matching summary using the job_link
+        const allSkillsString = record.job_skills;
+    // Find the matching summary first
         const summary = jobLinkToSummaryMap.get(jobLink);
 
-        // Only proceed if we found a summary
-        if (summary) {
-            if (DRY_RUN && !DRY_RUN_SKILLS.includes(skillKey)) continue;
+        // Only proceed if we have a summary AND a skill string
+    if (summary && allSkillsString.length > 0) {
 
-            if (!skillsToSummaries.has(skillKey)) {
-                skillsToSummaries.set(skillKey, []);
+            // 1. Split the string by commas
+            const individualSkills = allSkillsString.split(',')
+                                                  .map(s => s.trim().toLowerCase()) // 2. Clean up (trim spaces, toLowerCase)
+                                                  .filter(s => s.length > 0);       // 3. Remove any empty strings
+
+            // 4. Loop over the *individual* skills
+            for (const skillKey of individualSkills) {
+                if (DRY_RUN && !DRY_RUN_SKILLS.includes(skillKey)) continue;
+
+                if (!skillsToSummaries.has(skillKey)) {
+                    skillsToSummaries.set(skillKey, []);
+                }
+                // Add the same summary to this specific skill's list
+                skillsToSummaries.get(skillKey).push(summary);
             }
-            skillsToSummaries.get(skillKey).push(summary);
         }
     }
-    
-    // Apply sample limit if set (mainly for skills, not summaries)
+
     const finalSkillsToSummaries = new Map(
         SAMPLE_LIMIT > 0 
             ? Array.from(skillsToSummaries.entries()).slice(0, SAMPLE_LIMIT) 
             : skillsToSummaries.entries()
-    );
-
+        );
     console.log(`Found ${finalSkillsToSummaries.size} unique skills linked to summaries.`);
 
-    // --- 3. Load Model (Unchanged) ---
+    // --- 3. Load Model ---
     console.log('Loading Universal Sentence Encoder model...');
     const model = await use.load();
     console.log('Model loaded.');
 
-    // --- 4. Generate & Average Embeddings (Logic Unchanged) ---
+    // --- 4. Generate & Average Embeddings ---
     console.log('Generating and averaging embeddings for each skill...');
     const skillEmbeddings = new Map();
     const labels = [];
     const embeddings = [];
 
     const progressBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-    // **MODIFIED**: Use the new map size
     progressBar.start(finalSkillsToSummaries.size, 0);
 
-    // **MODIFIED**: Use the new map
     for (const [skill, summaries] of finalSkillsToSummaries.entries()) {
-        // 'summaries' is the new 'descriptions'
         const descriptionCount = summaries.length; 
         let accumulatedEmbedding = tf.zeros([1, 512]);
 
+        console.log(`\nProcessing skill: "${skill}" (${descriptionCount} summaries total)`);
+
         for (let i = 0; i < descriptionCount; i += BATCH_SIZE) {
             const batch = summaries.slice(i, i + BATCH_SIZE);
+            console.log(`  - Skill "${skill}": Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(descriptionCount / BATCH_SIZE)}`);
             const batchEmbeddings = await model.embed(batch);
             const batchSum = tf.sum(batchEmbeddings, 0, true);
             accumulatedEmbedding = tf.add(accumulatedEmbedding, batchSum);
@@ -153,7 +148,7 @@ async function main() {
     progressBar.stop();
     console.log('Embeddings generated.');
 
-    // --- 5. Save Artifacts (Unchanged) ---
+    // --- 5. Save Artifacts ---
     console.log('Saving model artifacts...');
     if (!fs.existsSync(MODEL_ARTIFACTS_PATH)) {
         fs.mkdirSync(MODEL_ARTIFACTS_PATH, { recursive: true });
@@ -163,6 +158,7 @@ async function main() {
 
     console.log(`Training complete! Model artifacts saved to ${MODEL_ARTIFACTS_PATH}`);
 }
+
 
 main().catch(err => {
     console.error('An error occurred during training:', err);

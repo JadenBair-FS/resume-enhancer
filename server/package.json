@@ -13,10 +13,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@tensorflow-models/universal-sentence-encoder": "^1.3.3",
-    "@tensorflow/tfjs": "^3.21.0",
-    "@tensorflow/tfjs-backend-cpu": "^3.21.0",
-    "@tensorflow/tfjs-node": "^4.17.0",
+    "@tensorflow-models/universal-sentence-encoder": "1.3.3",
+    "@tensorflow/tfjs-node": "2.8.6",
     "axios": "^1.12.2",
     "cli-progress": "^3.12.0",
     "cors": "^2.8.5",
@@ -31,5 +29,14 @@
   },
   "directories": {
     "lib": "lib"
+  },
+  "overrides": {
+    "@tensorflow/tfjs": "2.8.6",
+    "@tensorflow/tfjs-backend-cpu": "2.8.6",
+    "@tensorflow/tfjs-backend-webgl": "2.8.6",
+    "@tensorflow/tfjs-converter": "2.8.6",
+    "@tensorflow/tfjs-core": "2.8.6",
+    "@tensorflow/tfjs-data": "2.8.6",
+    "@tensorflow/tfjs-layers": "2.8.6"
   }
 }
