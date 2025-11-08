@@ -11,159 +11,130 @@ const require = createRequire(import.meta.url);
 const tf = require('@tensorflow/tfjs-node');
 
 
-// config
+// --- CONFIGURATION ---
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CSV_PATH = path.resolve(__dirname, 'postings.csv');
+
+// **NEW**: Update paths to your downloaded Kaggle CSVs
+const SUMMARY_CSV_PATH = path.resolve(__dirname, 'job_summary.csv');
+const SKILLS_CSV_PATH = path.resolve(__dirname, 'job_skills.csv');
+
+// **NEW**: Make sure your model artifacts path is correct
 const MODEL_ARTIFACTS_PATH = path.resolve(__dirname, 'model');
 const EMBEDDINGS_PATH = path.resolve(MODEL_ARTIFACTS_PATH, 'embeddings.json');
 const LABELS_PATH = path.resolve(MODEL_ARTIFACTS_PATH, 'labels.json');
 
-// Sill Dataset (hardcoded)
-const SKILL_DATASET = [
-    // Technical & IT Skills
-    // Software & Web Development
-    'HTML5', 'CSS3', 'JavaScript', 'ES6+', 'TypeScript', 'React', 'Angular', 'Vue.js', 'Svelte', 'jQuery',
-    'Webpack', 'Babel', 'Bootstrap', 'Tailwind CSS', 'Sass', 'LESS', 'Node.js', 'Python', 'Django', 'Flask',
-    'Java', 'Spring', 'C#', '.NET', 'Ruby', 'Ruby on Rails', 'PHP', 'Laravel', 'Go', 'Express.js', 'REST APIs',
-    'GraphQL', 'Swift', 'iOS Development', 'Kotlin', 'Android Development', 'React Native', 'Flutter',
-    'SQL', 'PostgreSQL', 'MySQL', 'Microsoft SQL Server', 'Oracle', 'NoSQL', 'MongoDB', 'Redis', 'Cassandra',
-    'Firebase', 'DynamoDB', 'AWS', 'Microsoft Azure', 'Google Cloud Platform (GCP)', 'Docker', 'Kubernetes',
-    'CI/CD', 'Jenkins', 'GitLab CI', 'GitHub Actions', 'CircleCI', 'Terraform', 'Ansible', 'Chef', 'Puppet',
-    'WordPress', 'Drupal', 'Joomla', 'Shopify', 'Magento', 'Jest', 'Mocha', 'Cypress', 'Selenium', 'JUnit', 'PyTest',
-    'Git', 'GitHub', 'GitLab', 'Bitbucket',
+// **REMOVED**: The hardcoded SKILL_DATASET is no longer needed.
 
-    // Data Science & Analytics
-    'Pandas', 'NumPy', 'Scikit-learn', 'R', 'Machine Learning', 'TensorFlow', 'PyTorch', 'Keras',
-    'Natural Language Processing (NLP)', 'Computer Vision', 'Data Visualization', 'Tableau', 'Power BI',
-    'D3.js', 'Matplotlib', 'Seaborn', 'Big Data', 'Hadoop', 'Spark', 'Kafka', 'Data Warehousing',
-    'Snowflake', 'Redshift', 'BigQuery', 'Data Analysis',
-
-    // IT & Cybersecurity
-    'Network Administration', 'TCP/IP', 'DNS', 'DHCP', 'System Administration', 'Linux', 'Windows Server',
-    'Cybersecurity', 'Penetration Testing', 'SIEM', 'Firewalls', 'Ethical Hacking', 'Cloud Security',
-    'IT Support', 'Help Desk',
-
-    // Business & Professional Skills
-    // Management & Operations
-    'Project Management', 'Agile', 'Scrum', 'Waterfall', 'Product Management', 'Business Development',
-    'Operations Management', 'Supply Chain Management', 'Logistics', 'Risk Management', 'Quality Assurance (QA)',
-    'Human Resources (HR)', 'Recruiting', 'Talent Acquisition', 'Jira',
-
-    // Finance & Accounting
-    'Financial Analysis', 'Financial Modeling', 'Accounting', 'GAAP', 'IFRS', 'Bookkeeping', 'QuickBooks',
-    'Xero', 'Auditing', 'Tax Preparation', 'Payroll Management', 'Forecasting', 'Budgeting',
-    'Investment Management',
-
-    // Sales & Marketing
-    'Digital Marketing', 'Search Engine Optimization (SEO)', 'Search Engine Marketing (SEM)', 'Pay-Per-Click (PPC)',
-    'Content Marketing', 'Social Media Marketing (SMM)', 'Email Marketing', 'Google Analytics', 'Adobe Analytics',
-    'Sales', 'Lead Generation', 'CRM', 'Salesforce', 'HubSpot', 'Negotiation', 'B2B Sales', 'B2C Sales',
-    'Market Research', 'Brand Management', 'Public Relations (PR)',
-
-    // Creative & Design Skills
-    'Graphic Design', 'Adobe Photoshop', 'Adobe Illustrator', 'Adobe InDesign', 'Figma', 'Sketch', 'Canva',
-    'UI/UX Design', 'User Research', 'Wireframing', 'Prototyping', 'Usability Testing', 'Copywriting',
-    'Editing', 'Blogging', 'Podcasting', 'Grant Writing', 'Video Editing', 'Adobe Premiere Pro', 'Final Cut Pro',
-    'Motion Graphics', 'Adobe After Effects', 'Photography', 'Digital Photography', 'Lighting', 'Photo Editing',
-
-    // Industry-Specific & Trade Skills
-    // Retail & Customer Service
-    'Point of Sale (POS) Systems', 'Customer Relationship Management (CRM)', 'Inventory Management',
-    'Visual Merchandising', 'Loss Prevention', 'Conflict Resolution', 'Clienteling', 'Customer Service',
-
-    // Real Estate
-    'Real Estate Law', 'Real Estate License', 'Property Management', 'Real Estate Appraisal',
-    'Leasing', 'Contract Negotiation', 'MLS (Multiple Listing Service)',
-
-    // Healthcare
-    'Electronic Health Records (EHR)', 'EMR', 'Medical Billing', 'Medical Coding', 'Patient Care',
-    'Patient Scheduling', 'HIPAA Compliance', 'Phlebotomy', 'Pharmacology',
-
-    // Trades & Manual Labor
-    'Carpentry', 'Plumbing', 'Electrical Work', 'Wiring', 'Welding', 'HVAC Systems', 'Automotive Repair',
-    'Forklift Operation', 'Food Safety', 'Food Handling',
-
-    // Universal Soft Skills
-    'Communication', 'Verbal Communication', 'Written Communication', 'Public Speaking', 'Active Listening',
-    'Leadership', 'Team Leadership', 'Mentoring', 'Decision Making', 'Strategic Planning', 'Teamwork',
-    'Collaboration', 'Interpersonal Skills', 'Empathy', 'Problem-Solving', 'Critical Thinking',
-    'Analytical Skills', 'Creativity', 'Time Management', 'Organization', 'Adaptability', 'Reliability',
-    'Attention to Detail', 'Work Ethic'
-];
-
-// training config
+// --- TRAINING CONFIG ---
 // Set to -1 to use all data.
 const SAMPLE_LIMIT = -1;
 const BATCH_SIZE = 100;
 const DRY_RUN = false;
 const DRY_RUN_SKILLS = ['javascript', 'python', 'react'];
 
-function escapeRegExp(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
-}
+// **REMOVED**: escapeRegExp function is no longer needed.
 
 async function main() {
     console.log('Starting training process...');
 
-    if (!fs.existsSync(CSV_PATH)) {
-        console.error(`Error: postings.csv not found at ${CSV_PATH}`);
+    // **NEW**: Check for both CSV files
+    if (!fs.existsSync(SUMMARY_CSV_PATH)) {
+        console.error(`Error: job_summary.csv not found at ${SUMMARY_CSV_PATH}`);
+        process.exit(1);
+    }
+    if (!fs.existsSync(SKILLS_CSV_PATH)) {
+        console.error(`Error: job_skills.csv not found at ${SKILLS_CSV_PATH}`);
         process.exit(1);
     }
 
-    // load and parse CSV
-    console.log(`Loading and parsing ${CSV_PATH}...`);
-    const csvData = fs.readFileSync(CSV_PATH, 'utf8');
-    const records = parse(csvData, {
+    // --- 1. Load Summaries into a Map ---
+    console.log(`Loading and parsing ${SUMMARY_CSV_PATH}...`);
+    const summaryCsvData = fs.readFileSync(SUMMARY_CSV_PATH, 'utf8');
+    const summaryRecords = parse(summaryCsvData, {
         columns: true,
         skip_empty_lines: true,
         trim: true,
     });
-    const trainingData = (SAMPLE_LIMIT > 0 ? records.slice(0, SAMPLE_LIMIT) : records)
-        .filter(r => r.description);
 
-    console.log(`Loaded ${trainingData.length} valid records.`);
+    console.log(`Loaded ${summaryRecords.length} summary records.`);
+    console.log('Creating job_link -> summary map...');
+    const jobLinkToSummaryMap = new Map();
+    for (const record of summaryRecords) {
+        if (record.job_link && record.job_summary) {
+            jobLinkToSummaryMap.set(record.job_link, record.job_summary);
+        }
+    }
+    console.log(`Map created with ${jobLinkToSummaryMap.size} valid summaries.`);
 
-    // load the Universal Sentence Encoder model
+
+    // --- 2. Load Skills and Group Summaries ---
+    console.log(`Loading and parsing ${SKILLS_CSV_PATH}...`);
+    const skillsCsvData = fs.readFileSync(SKILLS_CSV_PATH, 'utf8');
+    const skillRecords = parse(skillsCsvData, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+    });
+
+    console.log(`Loaded ${skillRecords.length} skill records.`);
+    console.log('Grouping job summaries by skill...');
+
+    // **MODIFIED**: This map now holds summaries, not descriptions
+    const skillsToSummaries = new Map();
+    
+    // **MODIFIED**: This loop replaces the old regex logic
+    for (const record of skillRecords) {
+        if (!record.job_link || !record.job_skill) continue;
+
+        const skillKey = record.job_skill.toLowerCase();
+        const jobLink = record.job_link;
+        
+        // Find the matching summary using the job_link
+        const summary = jobLinkToSummaryMap.get(jobLink);
+
+        // Only proceed if we found a summary
+        if (summary) {
+            if (DRY_RUN && !DRY_RUN_SKILLS.includes(skillKey)) continue;
+
+            if (!skillsToSummaries.has(skillKey)) {
+                skillsToSummaries.set(skillKey, []);
+            }
+            skillsToSummaries.get(skillKey).push(summary);
+        }
+    }
+    
+    // Apply sample limit if set (mainly for skills, not summaries)
+    const finalSkillsToSummaries = new Map(
+        SAMPLE_LIMIT > 0 
+            ? Array.from(skillsToSummaries.entries()).slice(0, SAMPLE_LIMIT) 
+            : skillsToSummaries.entries()
+    );
+
+    console.log(`Found ${finalSkillsToSummaries.size} unique skills linked to summaries.`);
+
+    // --- 3. Load Model (Unchanged) ---
     console.log('Loading Universal Sentence Encoder model...');
     const model = await use.load();
     console.log('Model loaded.');
 
-    // group descriptions by skill using regex matching
-    console.log('Grouping job descriptions by skill...');
-    const skillsToDescriptions = new Map();
-    for (const record of trainingData) {
-        const lowerCaseDescription = record.description.toLowerCase();
-        for (const skill of SKILL_DATASET) {
-            const skillRegex = new RegExp(`\\b${escapeRegExp(skill.toLowerCase())}\\b`);
-            if (skillRegex.test(lowerCaseDescription)) {
-                const skillKey = skill.toLowerCase();
-                if (DRY_RUN && !DRY_RUN_SKILLS.includes(skillKey)) continue;
-
-                if (!skillsToDescriptions.has(skillKey)) {
-                    skillsToDescriptions.set(skillKey, []);
-                }
-                skillsToDescriptions.get(skillKey).push(record.description);
-            }
-        }
-    }
-    console.log(`Found ${skillsToDescriptions.size} unique skills.`);
-
-    // generate and average embeddings for each skill
+    // --- 4. Generate & Average Embeddings (Logic Unchanged) ---
     console.log('Generating and averaging embeddings for each skill...');
     const skillEmbeddings = new Map();
     const labels = [];
     const embeddings = [];
 
-    //progress bar so I know its working
     const progressBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-    progressBar.start(skillsToDescriptions.size, 0);
+    // **MODIFIED**: Use the new map size
+    progressBar.start(finalSkillsToSummaries.size, 0);
 
-    for (const [skill, descriptions] of skillsToDescriptions.entries()) {
-        const descriptionCount = descriptions.length;
+    // **MODIFIED**: Use the new map
+    for (const [skill, summaries] of finalSkillsToSummaries.entries()) {
+        // 'summaries' is the new 'descriptions'
+        const descriptionCount = summaries.length; 
         let accumulatedEmbedding = tf.zeros([1, 512]);
 
         for (let i = 0; i < descriptionCount; i += BATCH_SIZE) {
-            const batch = descriptions.slice(i, i + BATCH_SIZE);
+            const batch = summaries.slice(i, i + BATCH_SIZE);
             const batchEmbeddings = await model.embed(batch);
             const batchSum = tf.sum(batchEmbeddings, 0, true);
             accumulatedEmbedding = tf.add(accumulatedEmbedding, batchSum);
@@ -182,10 +153,10 @@ async function main() {
     progressBar.stop();
     console.log('Embeddings generated.');
 
-    // save artifacts
+    // --- 5. Save Artifacts (Unchanged) ---
     console.log('Saving model artifacts...');
     if (!fs.existsSync(MODEL_ARTIFACTS_PATH)) {
-        fs.mkdirSync(MODEL_ARTIFACTS_PATH);
+        fs.mkdirSync(MODEL_ARTIFACTS_PATH, { recursive: true });
     }
     fs.writeFileSync(LABELS_PATH, JSON.stringify(labels, null, 2));
     fs.writeFileSync(EMBEDDINGS_PATH, JSON.stringify(embeddings, null, 2));

@@ -1,4 +1,3 @@
-// server/server.js
 import express, { json, urlencoded } from 'express';
 import cors from 'cors';
 import multer, { diskStorage } from 'multer';
@@ -43,25 +42,29 @@ app.post('/api/enhance', upload.single('resume'), async (req, res) => {
     const { path: resumePath } = req.file;
     const { jobUrl } = req.body;
 
-    console.log(`Received resume: ${resumePath}`);
-    console.log(`Received URL: ${jobUrl}`);
-
     try {
-        //scrape the job description
+        // 1. Scrape the job description
         const jobText = await scrapeJobDescription(jobUrl);
         if (!jobText) {
             return res.status(500).json({ error: 'Could not scrape job description.' });
         }
+        // 2. Extract skills using the skill model
+        const skillData = await extractSkills(jobText);
 
-        // analyze the job description to extract skills
-        const skills = await extractSkills(jobText);
+        // 3. Prepare skill names for resume enhancement
+        const skillNames = skillData.map((s) => s.skill);
 
-        await addSkillsToResume(resumePath, skills, 'responses/' + resumePath.replace('uploads/', 'enhanced-'));
+        // 4. Send resume + skill NAMES to Python to get the new .docx
+        await addSkillsToResume(
+            resumePath,
+            skillNames,
+            'responses/' + resumePath.replace('uploads/', 'enhanced-')
+        );
 
-        //temporarily return the detected skills and resume path
+        // 5. Respond with detected skills and path to enhanced resume
         res.status(200).json({
             message: 'Data received and processed successfully!',
-            detectedSkills: skills,
+            detectedSkills: skillData, // Send the full object!
             resumePath: resumePath,
         });
     } catch (error) {
@@ -69,7 +72,6 @@ app.post('/api/enhance', upload.single('resume'), async (req, res) => {
         res.status(500).json({ error: 'An internal server error occurred.' });
     }
 });
-
 app.get('/responses/enhanced-:filename', (req, res) => {
     const { filename } = req.params;
     const enhancedFilename = `enhanced-${filename}`;

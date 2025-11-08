@@ -72,7 +72,7 @@ export default function Dashboard() {
     <div className="card dashboard-card">
       <header className="header-with-logout">
         <div className="header-content">
-          <h1>Dashboard 🚀</h1>
+          <h1>Dashboard</h1>
           <p>Welcome, {user.email}</p>
         </div>
         <button onClick={signOut} className="btn-logout">

@@ -29,10 +29,11 @@ async function extractSkills(jobDescriptionText) {
         try {
             console.log('Using ML model to extract skills...');
             const { stdout } = await execFileAsync('node', [PREDICT_SCRIPT_PATH, jobDescriptionText]);
-            const predictions = JSON.parse(stdout);
-            const skills = predictions.map(p => p.skill);
-            console.log('Detected skills (ML):', skills);
-            return skills;
+            const predictions = JSON.parse(stdout); 
+            
+            console.log('Detected skills (ML):', predictions);
+            return predictions; 
+         
         } catch (error) {
             console.error('ML prediction failed, falling back to regex:', error);
             // Fallback to regex if the script fails
@@ -52,8 +53,13 @@ async function extractSkills(jobDescriptionText) {
         }
     });
 
-    console.log('Detected skills (Regex):', Array.from(foundSkills));
-    return Array.from(foundSkills);
+    const skillData = Array.from(foundSkills).map(skillName => ({
+        skill: skillName,
+        score: 1.0 
+    }));
+    
+    console.log('Detected skills (Regex):', skillData);
+    return skillData;
 }
 
 export { extractSkills };
