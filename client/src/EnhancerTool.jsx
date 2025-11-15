@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+
 import ResultsDashboard from './ResultsDashboard.jsx';
 
-
 export default function EnhanceTool() {
-  // Form state
   const [resumeFile, setResumeFile] = useState(null);
   const [jobLink, setJobLink] = useState('');
 
-  // App state
   const [appState, setAppState] = useState('form'); 
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Result state
-  const [skillData, setSkillData] = useState([]);
-  const [downloadPath, setDownloadPath] = useState('');
+  const [aiSkills, setAiSkills] = useState([]); 
+  const [userSkills, setUserSkills] = useState([]); 
+  const [downloadUrl, setDownloadUrl] = useState(''); 
+
 
   const handleFileChange = (e) => {
     setResumeFile(e.target.files[0]);
@@ -50,51 +49,54 @@ export default function EnhanceTool() {
         }
       );
 
-      // Handle success
-      setSkillData(response.data.detectedSkills);
- 
-      setDownloadPath(
-        response.data.resumePath.replace(
-          'uploads/',
-          'http://localhost:3001/responses/enhanced-'
-        )
-      );
+
+      setAiSkills(response.data.aiRecommendedSkills);
+      setUserSkills(response.data.userExistingSkills);
+      const url =
+        'data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,' +
+        response.data.fileData;
+      setDownloadUrl(url);
+
+
       setAppState('success');
     } catch (error) {
       // Handle error
       console.error('Error enhancing resume:', error);
       setErrorMessage(
-        error.response?.data?.error || 
-        'An unknown error occurred. Please try again.'
+        error.response?.data?.error ||
+          'An unknown error occurred. Please try again.'
       );
       setAppState('error');
     }
   };
 
+  // Reset the form to start over
   const handleReset = () => {
     setResumeFile(null);
     setJobLink('');
     setAppState('form');
     setErrorMessage('');
-    setSkillData([]);
-    setDownloadPath('');
-  };
+    setAiSkills([]);
+    setUserSkills([]);
+    setDownloadUrl('');
 
+  };
   const renderContent = () => {
     switch (appState) {
       case 'loading':
         return (
           <div className="loading-container">
             <div className="loading-spinner"></div>
-            <p>Enhancing your resume... this may take a moment.</p>
+            <p>Analyzing your resume... this may take a moment.</p>
           </div>
         );
 
       case 'success':
         return (
           <ResultsDashboard
-            skillData={skillData}
-            downloadPath={downloadPath}
+            aiSkills={aiSkills}
+            userSkills={userSkills}
+            downloadUrl={downloadUrl}
             onReset={handleReset}
           />
         );

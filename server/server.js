@@ -16,9 +16,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // middleware
-app.use(cors()); // Allow cross-origin requests
-app.use(json()); // Parse JSON bodies
-app.use(urlencoded({ extended: true })); // Parse URL-encoded bodies
+app.use(cors()); 
+app.use(json());
+app.use(urlencoded({ extended: true })); 
 
 // multer to handle file uploads
 // store files in a uploads/ directory
@@ -33,45 +33,72 @@ const storage = diskStorage({
 });
 const upload = multer({ storage: storage });
 
+async function callPythonSkillService(resumePath, skillNames) {
+  const form = new FormData();
+  
+  form.append('resume', fs.createReadStream(resumePath));
+  skillNames.forEach(skill => {
+    form.append('skills', skill);
+  });
+
+  try {
+    const response = await axios.post('http://127.0.0.1:5000/add-skills', form, {
+      headers: {
+        ...form.getHeaders(),
+      },
+    });
+
+    return response.data;
+
+  } catch (error) {
+    console.error('Error calling Python service:', error.message);
+    if (error.response) {
+      console.error('Python service responded with:', error.response.data);
+      throw new Error(error.response.data.error || 'Python service failed');
+    }
+    throw new Error('Could not connect to Python skill service.');
+  }
+}
+
 // api endpoint
 app.post('/api/enhance', upload.single('resume'), async (req, res) => {
-    if (!req.file || !req.body.jobUrl) {
-        return res.status(400).json({ error: 'Resume file and job URL are required.' });
+  if (!req.file || !req.body.jobUrl) {
+    return res.status(400).json({ error: 'Resume file and job URL are required.' });
+  }
+
+  const { path: resumePath } = req.file;
+  const { jobUrl } = req.body;
+
+  try {
+    //Scrape the job description
+    const jobText = await scrapeJobDescription(jobUrl);
+    if (!jobText) {
+      return res.status(500).json({ error: 'Could not scrape job description.' });
     }
 
-    const { path: resumePath } = req.file;
-    const { jobUrl } = req.body;
+    const aiRecommendedSkills = await extractSkills(jobText);
+    const skillNames = aiRecommendedSkills.map((s) => s.skill);
+    const pythonResponse = await callPythonSkillService(resumePath, skillNames);
 
-    try {
-        // 1. Scrape the job description
-        const jobText = await scrapeJobDescription(jobUrl);
-        if (!jobText) {
-            return res.status(500).json({ error: 'Could not scrape job description.' });
-        }
-        // 2. Extract skills using the skill model
-        const skillData = await extractSkills(jobText);
+    res.status(200).json({
+      message: 'Resume enhanced successfully!',
+      
+      aiRecommendedSkills: aiRecommendedSkills,
+      userExistingSkills: pythonResponse.existing_skills,
+      fileData: pythonResponse.file_data,
+      addedSkills: pythonResponse.added_skills 
+    });
 
-        // 3. Prepare skill names for resume enhancement
-        const skillNames = skillData.map((s) => s.skill);
-
-        // 4. Send resume + skill NAMES to Python to get the new .docx
-        await addSkillsToResume(
-            resumePath,
-            skillNames,
-            'responses/' + resumePath.replace('uploads/', 'enhanced-')
-        );
-
-        // 5. Respond with detected skills and path to enhanced resume
-        res.status(200).json({
-            message: 'Data received and processed successfully!',
-            detectedSkills: skillData, // Send the full object!
-            resumePath: resumePath,
-        });
-    } catch (error) {
-        console.error('Error processing request:', error);
-        res.status(500).json({ error: 'An internal server error occurred.' });
-    }
+  } catch (error) {
+    console.error('Error in /api/enhance route:', error.message);
+    res.status(500).json({ error: error.message || 'An internal server error occurred.' });
+  } finally {
+    fs.unlink(resumePath, (err) => {
+      if (err) console.error(`Failed to delete temp file: ${resumePath}`, err);
+    });
+  }
 });
+
 app.get('/responses/enhanced-:filename', (req, res) => {
     const { filename } = req.params;
     const enhancedFilename = `enhanced-${filename}`;

@@ -1,10 +1,80 @@
 import io
+import json
+import base64  
 from flask import Flask, request, send_file, jsonify
 from docx import Document
 from docx.opc.exceptions import OpcError
 from docx.text.paragraph import Paragraph
 
 app = Flask(__name__)
+
+def extract_skills_from_doc(doc: Document):
+    existing_skills = set()
+    skills_heading_found = False
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                skills_heading_found_in_cell = False
+                for i, para in enumerate(cell.paragraphs):
+                    current_text = para.text.strip()
+                    if not current_text:
+                        continue
+                    if not skills_heading_found_in_cell:
+                        if current_text.lower().startswith('skills'):
+                            skills_heading_found_in_cell = True
+                        continue
+                    if ',' in current_text:
+                        skills = current_text.split(',')
+                        for skill in skills:
+                            cleaned_skill = skill.strip().title()
+                            if cleaned_skill:
+                                existing_skills.add(cleaned_skill)
+                        break
+                    else:
+                        is_new_heading = (para.style.name.startswith('Heading') or 
+                                          (current_text.isupper() and len(current_text) > 4))
+                        if is_new_heading:
+                            break
+                        
+                        cleaned_skill = current_text.strip().title()
+                        if cleaned_skill:
+                            existing_skills.add(cleaned_skill)
+                
+                if skills_heading_found_in_cell: break
+            if skills_heading_found_in_cell: break
+        if skills_heading_found_in_cell: break
+
+    if not existing_skills:
+        skills_heading_found = False
+        for i, para in enumerate(doc.paragraphs):
+            current_text = para.text.strip()
+            if not current_text:
+                continue
+            if not skills_heading_found:
+                if current_text.lower().startswith('skills') and not para.style.name.lower().startswith('list'):
+                    skills_heading_found = True
+                continue
+            if ',' in current_text:
+                skills = current_text.split(',')
+                for skill in skills:
+                    cleaned_skill = skill.strip().title()
+                    if cleaned_skill:
+                        existing_skills.add(cleaned_skill)
+                break
+        
+            else:
+                is_new_heading = (para.style.name.startswith('Heading') or 
+                                  (current_text.isupper() and len(current_text) > 4))
+                if is_new_heading:
+                    break
+                
+                cleaned_skill = current_text.strip().title()
+                if cleaned_skill:
+                    existing_skills.add(cleaned_skill)
+
+    print(f"Found existing skills: {list(existing_skills)}")
+    return list(existing_skills)
 
 def get_processed_skills(skills_to_add):
     processed_skills = []
@@ -19,7 +89,6 @@ def get_processed_skills(skills_to_add):
 def _copy_paragraph_format(source_para: Paragraph, target_para: Paragraph):
     fmt = source_para.paragraph_format
     target_fmt = target_para.paragraph_format
-    
     target_fmt.alignment = fmt.alignment
     target_fmt.first_line_indent = fmt.first_line_indent
     target_fmt.keep_together = fmt.keep_together
@@ -32,6 +101,7 @@ def _copy_paragraph_format(source_para: Paragraph, target_para: Paragraph):
     target_fmt.space_after = fmt.space_after
     target_fmt.space_before = fmt.space_before
     target_fmt.widow_control = fmt.widow_control
+
 
 def add_skills_to_paragraph(para: Paragraph, skills_to_add_list: list):
     new_skills_string = ", ".join(skills_to_add_list)
@@ -54,6 +124,7 @@ def add_skills_to_paragraph(para: Paragraph, skills_to_add_list: list):
         new_run.font.underline = font.underline
         new_run.font.color.rgb = font.color.rgb
 
+
 def add_skills_to_list(insertion_para: Paragraph, skills_to_add_list: list, ref_para: Paragraph):
     for skill in reversed(skills_to_add_list):
         try:
@@ -70,17 +141,33 @@ def modify_resume():
         return jsonify({"error": "No resume file provided"}), 400
         
     file_storage = request.files['resume']
-    skills_to_add = request.form.getlist('skills') 
-    if not skills_to_add:
+    skills_to_add_raw = request.form.getlist('skills') 
+    if not skills_to_add_raw:
         return jsonify({"error": "No skills provided"}), 400
 
     try:
-        doc = Document(file_storage.stream)
-        processed_skills = get_processed_skills(skills_to_add)
-        skills_added = False
+        file_bytes = file_storage.stream.read()
+        doc_for_reading = Document(io.BytesIO(file_bytes))
+        
+        doc_for_writing = Document(io.BytesIO(file_bytes))
+        
+        existing_skills = extract_skills_from_doc(doc_for_reading)
 
+        processed_skills_to_add = get_processed_skills(skills_to_add_raw)
+
+        existing_skills_lower = set(s.lower() for s in existing_skills)
+        final_skills_to_add = [
+            s for s in processed_skills_to_add 
+            if s.lower() not in existing_skills_lower
+        ]
+
+        if not final_skills_to_add:
+            print("No new skills to add. All recommended skills are already present.")
+        
+        skills_added = False
+        
         # Table Search Mode
-        for table in doc.tables:
+        for table in doc_for_writing.tables:
             for row in table.rows:
                 for cell in row.cells:
                     skills_heading_found_in_cell = False
@@ -103,7 +190,6 @@ def modify_resume():
                         if not is_paragraph_style:
                             # Add to list in cell
                             insertion_point = None
-                            
                             reference_para = first_skill_para 
                             
                             for j in range(first_skill_para_index + 1, len(cell.paragraphs)):
@@ -116,7 +202,6 @@ def modify_resume():
                                 
                                 if is_blank or is_new_heading:
                                     insertion_point = sub_para
-                                    
                                     if j > first_skill_para_index:
                                         reference_para = cell.paragraphs[j-1]
                                     break
@@ -124,16 +209,15 @@ def modify_resume():
                                     reference_para = sub_para 
                             
                             if insertion_point:
-                                add_skills_to_list(insertion_point, processed_skills, reference_para)
+                                add_skills_to_list(insertion_point, final_skills_to_add, reference_para)
                             else:
-                                # No end-point, add to end of cell
-                                for skill in processed_skills:
+                                for skill in final_skills_to_add:
                                     new_para = cell.add_paragraph(skill, style=reference_para.style)
                                     _copy_paragraph_format(reference_para, new_para)
                             skills_added = True
 
                         else:
-                            add_skills_to_paragraph(first_skill_para, processed_skills)
+                            add_skills_to_paragraph(first_skill_para, final_skills_to_add)
                             skills_added = True
                     
                     if skills_added: break
@@ -145,7 +229,7 @@ def modify_resume():
             skills_heading_found = False
             target_para_index = -1 
             
-            for i, para in enumerate(doc.paragraphs):
+            for i, para in enumerate(doc_for_writing.paragraphs):
                 current_text = para.text.lower().strip()
                 if not skills_heading_found:
                     if current_text.startswith('skills') and not para.style.name.lower().startswith('list'):
@@ -156,7 +240,7 @@ def modify_resume():
                     break
             
             if target_para_index != -1:
-                target_para = doc.paragraphs[target_para_index]
+                target_para = doc_for_writing.paragraphs[target_para_index]
                 is_paragraph_style = ',' in target_para.text
                 
                 if not is_paragraph_style:
@@ -164,8 +248,8 @@ def modify_resume():
                     insertion_point = None
                     reference_para = target_para 
                     
-                    for j in range(target_para_index + 1, len(doc.paragraphs)):
-                        sub_para = doc.paragraphs[j]
+                    for j in range(target_para_index + 1, len(doc_for_writing.paragraphs)):
+                        sub_para = doc_for_writing.paragraphs[j]
                         sub_text = sub_para.text.strip()
                         is_blank = not sub_text
                         is_new_heading = (sub_para.style.name.startswith('Heading') or 
@@ -174,41 +258,43 @@ def modify_resume():
                         if is_blank or is_new_heading:
                             insertion_point = sub_para
                             if j > target_para_index:
-                                reference_para = doc.paragraphs[j-1]
+                                reference_para = doc_for_writing.paragraphs[j-1]
                             break
                         elif sub_text:
                             reference_para = sub_para
                     
                     if insertion_point:
-                        add_skills_to_list(insertion_point, processed_skills, reference_para)
+                        add_skills_to_list(insertion_point, final_skills_to_add, reference_para)
                     else: 
-                        for skill in processed_skills:
-                            new_para = doc.add_paragraph(skill, style=reference_para.style)
+                        for skill in final_skills_to_add:
+                            new_para = doc_for_writing.add_paragraph(skill, style=reference_para.style)
                             _copy_paragraph_format(reference_para, new_para)
                     skills_added = True
                 
                 else:
-                    add_skills_to_paragraph(target_para, processed_skills)
+                    add_skills_to_paragraph(target_para, final_skills_to_add)
                     skills_added = True
 
         # Fallback
-        if not skills_added:
-            doc.add_heading('Skills', level=1)
-            new_skills_string = ", ".join(processed_skills)
-            doc.add_paragraph(new_skills_string)
+        if not skills_added and final_skills_to_add:
+            doc_for_writing.add_heading('Skills', level=1)
+            new_skills_string = ", ".join(final_skills_to_add)
+            doc_for_writing.add_paragraph(new_skills_string)
             print("Fallback: Added skills to end of document.")
 
-        # Save and send the file back
         file_stream = io.BytesIO()
-        doc.save(file_stream)
+        doc_for_writing.save(file_stream)
         file_stream.seek(0)
         
-        print("Successfully modified resume, copying spacing from last skill.")
-        return send_file(
-            file_stream, as_attachment=True,
-            download_name="updated_resume.docx",
-            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+        encoded_file_data = base64.b64encode(file_stream.read()).decode('utf-8')
+        
+        print("Successfully processed resume. Returning JSON.")
+        
+        return jsonify({
+            "existing_skills": existing_skills,
+            "file_data": encoded_file_data,
+            "added_skills": final_skills_to_add
+        })
         
     except OpcError:
         return jsonify({"error": "Invalid file format. Please upload a .docx file."}), 400

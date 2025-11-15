@@ -21,7 +21,7 @@ const LABELS_PATH = path.resolve(MODEL_ARTIFACTS_PATH, 'labels.json');
 
 // --- TRAINING CONFIG ---
 // Set to -1 to use all data.
-const SAMPLE_LIMIT = 100;
+const SAMPLE_LIMIT = -1;
 const BATCH_SIZE = 100;
 const DRY_RUN = false;
 const DRY_RUN_SKILLS = ['javascript', 'python', 'react'];
@@ -129,7 +129,7 @@ async function main() {
 
         for (let i = 0; i < descriptionCount; i += BATCH_SIZE) {
             const batch = summaries.slice(i, i + BATCH_SIZE);
-            console.log(`  - Skill "${skill}": Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(descriptionCount / BATCH_SIZE)}`);
+            //console.log(`  - Skill "${skill}": Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(descriptionCount / BATCH_SIZE)}`);
             const batchEmbeddings = await model.embed(batch);
             const batchSum = tf.sum(batchEmbeddings, 0, true);
             accumulatedEmbedding = tf.add(accumulatedEmbedding, batchSum);
